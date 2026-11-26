@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IRON GASSER — Flight Game</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    background: #0b1620; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+  #gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #hud { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(4, 12, 20, 0.55); color: #e8f2f7; z-index: 10; }
+  .panel { width: min(680px, 92vw); background: rgba(8, 22, 34, 0.92); border: 1px solid #2e6f8e;
+    border-radius: 10px; padding: 28px 32px; box-shadow: 0 0 40px rgba(0, 0, 0, 0.6); }
+  .panel h1 { margin: 0 0 4px; font-size: 44px; letter-spacing: 6px; color: #ffb347;
+    text-shadow: 0 0 18px rgba(255, 179, 71, 0.5); }
+  .panel h2 { margin: 0 0 14px; font-size: 15px; letter-spacing: 3px; color: #7fd4e8; font-weight: 600; }
+  .panel p { margin: 8px 0; font-size: 14px; line-height: 1.5; color: #c8dde8; }
+  .missions { display: flex; flex-direction: column; gap: 10px; margin: 18px 0; }
+  .mission { pointer-events: auto; cursor: pointer; text-align: left; background: #10283a;
+    border: 1px solid #2e6f8e; border-radius: 8px; padding: 12px 16px; color: #e8f2f7; }
+  .mission:hover, .mission:focus { background: #17394f; border-color: #ffb347; outline: none; }
+  .mission b { display: block; font-size: 17px; letter-spacing: 1px; color: #ffd28a; }
+  .mission span { font-size: 13px; color: #a9c6d4; }
+  .keys { font-size: 12.5px; color: #8fb2c2; line-height: 1.8; }
+  .keys b { color: #e8f2f7; background: #1c3a4e; border: 1px solid #3a6a80; border-radius: 4px;
+    padding: 1px 6px; font-weight: 600; }
+  .hidden { display: none !important; }
+  #debriefTitle { font-size: 34px; letter-spacing: 4px; }
+  .big { font-size: 22px; font-weight: 700; }
+  .btn { pointer-events: auto; cursor: pointer; background: #ffb347; color: #1a1206; border: none;
+    border-radius: 6px; padding: 10px 22px; font-size: 15px; font-weight: 700; letter-spacing: 1px; }
+  .btn:hover { background: #ffc978; }
+  .btn.ghost { background: transparent; color: #c8dde8; border: 1px solid #2e6f8e; margin-left: 8px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="hud"></canvas>
+
+<div id="menu" class="overlay">
+  <div class="panel">
+    <h1>IRON GASSER</h1>
+    <h2>PULSE-DETONATION FLIGHT DEMONSTRATOR &mdash; DAWN SORTIES</h2>
+    <p>Chase-view flight over the basalt ridges of the Kestrel Range. Three sorties,
+       one airframe, limited fuel. Fly smooth, fly smart, bring her home.</p>
+    <div class="missions">
+      <button class="mission" id="m1"><b>1 &mdash; RING RUN</b>
+        <span>Thread 8 glowing rings in order, against the clock. Smooth throttle, clean turns.</span></button>
+      <button class="mission" id="m2"><b>2 &mdash; INTERCEPT</b>
+        <span>Three drone freighters cross the ridge line. Hold the crosshair on each for 2 s to tag it.</span></button>
+      <button class="mission" id="m3"><b>3 &mdash; FERRY LANDING</b>
+        <span>Low fuel, crosswind gusts. Put her down on the 600 m dirt strip, gear down, gentle sink.</span></button>
+    </div>
+    <p class="keys">
+      <b>W</b>/<b>S</b> throttle &nbsp; <b>A</b>/<b>D</b> or <b>&larr;</b>/<b>&rarr;</b> bank &amp; turn &nbsp;
+      <b>&uarr;</b>/<b>&darr;</b> pitch trim &nbsp; <b>Mouse</b> pitch / roll trim &nbsp; <b>Shift</b> air-brake<br>
+      <b>Space</b> lock / tag (Intercept) &nbsp; <b>G</b> gear &nbsp; <b>F</b> flaps &nbsp; <b>C</b> chase / cockpit camera<br>
+      <b>R</b> restart sortie &nbsp; <b>P</b> / <b>Esc</b> pause
+    </p>
+  </div>
+</div>
+
+<div id="pause" class="overlay hidden">
+  <div class="panel">
+    <h2 id="pauseTitle">PAUSED</h2>
+    <p class="keys">
+      <b>W</b>/<b>S</b> throttle &nbsp; <b>A</b>/<b>D</b> bank &amp; turn &nbsp; <b>Shift</b> air-brake &nbsp;
+      <b>Space</b> lock / tag &nbsp; <b>G</b> gear &nbsp; <b>F</b> flaps &nbsp; <b>C</b> camera &nbsp;
+      <b>R</b> restart &nbsp; <b>P</b> / <b>Esc</b> resume
+    </p>
+    <button class="btn" id="resumeBtn">RESUME</button>
+    <button class="btn ghost" id="quitBtn">QUIT TO MENU</button>
+  </div>
+</div>
+
+<div id="debrief" class="overlay hidden">
+  <div class="panel">
+    <h2 id="debriefTitle">MISSION COMPLETE</h2>
+    <p id="debriefText" class="big"></p>
+    <p id="debriefStats"></p>
+    <button class="btn" id="againBtn">FLY AGAIN</button>
+    <button class="btn ghost" id="menuBtn">MISSION SELECT</button>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
